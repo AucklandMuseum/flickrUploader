@@ -147,6 +147,7 @@ def upload_photo(file, title, desc, tags):
                       #   in any case.
                       #   is_public=0,
                       asynchronous=0)
+    log.info("Done.")
     print("\n")
     pass
 
