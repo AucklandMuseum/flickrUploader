@@ -55,18 +55,20 @@ def get_JSON():
     """Reads filenames, extracts IDs and retrieves title, description, and
     credit line from the AM API. Adds departments as tags."""
     if glob.glob('*.jpg'):
-        log.info("Found {0} JPEG files".format(len(glob.glob('*.jpg'))))
+        file_count = len(glob.glob('*.jpg'))
+        log.info("Found {0} JPEG files".format(file_count))
         print("")
-        for file in glob.iglob('*.jpg'):
+        jpeg_files = glob.iglob('*.jpg')
+        for count, filename in enumerate(jpeg_files):
             print("----\n")
-            log.info("File: {0}".format(file))
+            log.info("File: {0}\n({1} of {2}).".format(
+                (count+1), filename, file_count))
             # We only want the Vernon ID, so split off the rest of the filename
-            id = file.split('_')[0]
+            id = filename.split('_')[0]
             url = ("http://api.aucklandmuseum.com/id/humanhistory/object/" + id)
             http_headers = {'Accept': 'application/json'}
 
             response = requests.request("GET", url, headers=http_headers)
-
             if response.status_code == 200:
                 log.info("Loaded {0}; response {1}.".format(
                     url, response.status_code))
@@ -85,7 +87,7 @@ def get_JSON():
 
                 flickrDesc = ("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}".format(
                     title, desc, credit, weburl))
-                upload_photo(file, title, flickrDesc, tags)
+                upload_photo(filename, title, flickrDesc, tags)
 
             else:
                 log.info("Response code {0} on {1}".format(
