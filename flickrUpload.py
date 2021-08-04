@@ -54,15 +54,16 @@ def get_keepers(url, http_headers):
 def get_JSON():
     """Reads filenames, extracts IDs and retrieves title, description, and
     credit line from the AM API. Adds departments as tags."""
-    if glob.glob('*.jpg'):
-        file_count = len(glob.glob('*.jpg'))
-        log.info("Found {0} JPEG files".format(file_count))
+    num_files = len(glob.glob('*.jpg'))
+    if num_files > 0:
+        log.info("Found {0} JPEG files".format(num_files))
         print("")
         jpeg_files = glob.iglob('*.jpg')
-        for count, filename in enumerate(jpeg_files):
+        for count, filename in enumerate(jpeg_files, start=1):
             print("----\n")
-            log.info("File: {0}\n({1} of {2}).".format(
-                (count+1), filename, file_count))
+            percent_complete = int((count * 100) / num_files)
+            log.info("File: {0} ({1} of {2}; {3}%).".format(
+                filename, count, num_files, percent_complete))
             # We only want the Vernon ID, so split off the rest of the filename
             id = filename.split('_')[0]
             url = ("http://api.aucklandmuseum.com/id/humanhistory/object/" + id)
@@ -96,6 +97,7 @@ def get_JSON():
     else:
         log.exception("No JPEGs in current directory. Exiting.")
         sys.exit()
+    log.info("Finished!")
 
 
 def get_credentials():
@@ -142,15 +144,13 @@ def upload_photo(file, title, desc, tags):
     log.info("Description: \"{0}\"".format(desc))
     log.info("Tag(s): \"{0}\"".format(tags))
     log.info("Uploading {0}".format(file))
+    # left off is_public=0 because it doesn't seem to work
+    # TODO: set copyright status (CC-BY) through this function
     flickr_api.upload(photo_file=file, title=title, description=desc, tags=tags,
                       safety_level=1,
                       content_type=1,
-                      #   Comment-out private declaration -- doesn't seem to work
-                      #   in any case.
-                      #   is_public=0,
                       asynchronous=0)
-    log.info("Done.")
-    print("\n")
+    log.info("Done.\n")
     pass
 
 
