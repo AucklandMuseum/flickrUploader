@@ -22,7 +22,7 @@ stream_handler.setLevel(logging.INFO)
 
 logfile_format = logging.Formatter(
     '%(asctime)s: %(name)s (%(funcName)s): %(message)s')
-logfile = logging.FileHandler(filename='flickrUpload.log')
+logfile = logging.FileHandler(filename='flickrUpload.log', encoding='utf8')
 logfile.setFormatter(logfile_format)
 logfile.setLevel(logging.DEBUG)
 
