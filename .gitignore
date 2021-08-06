@@ -2,3 +2,4 @@
 *.log
 flickrAuthData.txt
 *.jpg
+.vscode/launch.json
