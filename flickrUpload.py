@@ -38,6 +38,15 @@ flickr_api.set_keys(api_key=flickrKey,
                     api_secret=flickrSecret)
 
 
+def two_decimals(number: float):
+    """Return passed number to two decimal places if not an integer,
+    otherwise return number as an integer,"""
+    if (number - int(number) != 0):
+        return "%.2f" % number
+    else:
+        return "%d" % number
+
+
 def get_keepers(url, http_headers):
     """Gets \"keepers\" (i.e., departments) from the AM API and returns a
     space-delimited string for Flickr's \'tags\' field."""
@@ -70,9 +79,12 @@ def get_JSON():
             for count, filename in enumerate(jpeg_files, start=1):
                 write.writerow([count, filename])
                 print("----\n")
-                percent_complete = int((count * 100) / num_files)
+                percent_complete = ((count * 100) / num_files)
                 log.info("File: {0} ({1} of {2}; {3}%).".format(
-                    filename, count, num_files, percent_complete))
+                    filename,
+                    count,
+                    num_files,
+                    two_decimals(percent_complete)))
                 # We only want the Vernon ID, so split off the rest of the filename
                 id = filename.split('_')[0]
                 url = ("http://api.aucklandmuseum.com/id/humanhistory/object/" + id)
