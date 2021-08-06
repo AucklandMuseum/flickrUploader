@@ -4,6 +4,7 @@
  - Logs to ./flickrUpload.log
 """
 
+import csv
 import glob
 import json
 import logging
@@ -59,41 +60,50 @@ def get_JSON():
         log.info("Found {0} JPEG files".format(num_files))
         print("")
         jpeg_files = glob.iglob('*.jpg')
-        for count, filename in enumerate(jpeg_files, start=1):
-            print("----\n")
-            percent_complete = int((count * 100) / num_files)
-            log.info("File: {0} ({1} of {2}; {3}%).".format(
-                filename, count, num_files, percent_complete))
-            # We only want the Vernon ID, so split off the rest of the filename
-            id = filename.split('_')[0]
-            url = ("http://api.aucklandmuseum.com/id/humanhistory/object/" + id)
-            http_headers = {'Accept': 'application/json'}
 
-            response = requests.request("GET", url, headers=http_headers)
-            if response.status_code == 200:
-                log.info("Loaded {0}; response {1}.".format(
-                    url, response.status_code))
-                jsonData = json.loads(response.text)
-                log.debug("Response JSON: {0}".format(jsonData))
+        with open("file_list.csv", 'w', newline='', encoding='utf-8') as output:
+            # Write headers to CSV file list
+            header = ["number", "filename"]
+            write = csv.writer(output)
+            write.writerow(header)
 
-                title = jsonData['dc:title'][0]['value'].capitalize()
-                desc = jsonData['dc:description'][0]['value']
-                credit = jsonData['am:creditLine'][0]['value']
-                weburl = (
-                    'https://www.aucklandmuseum.com/collection/object/am_humanhistory-object-' + id)
+            for count, filename in enumerate(jpeg_files, start=1):
+                write.writerow([count, filename])
+                print("----\n")
+                percent_complete = int((count * 100) / num_files)
+                log.info("File: {0} ({1} of {2}; {3}%).".format(
+                    filename, count, num_files, percent_complete))
+                # We only want the Vernon ID, so split off the rest of the filename
+                id = filename.split('_')[0]
+                url = ("http://api.aucklandmuseum.com/id/humanhistory/object/" + id)
+                http_headers = {'Accept': 'application/json'}
 
-                keepers_url = jsonData['ecrm:P50_has_current_keeper'][0]['value']
-                tags = ""
-                tags = get_keepers(keepers_url, http_headers)
+                response = requests.request("GET", url, headers=http_headers)
+                if response.status_code == 200:
+                    log.info("Loaded {0}; response {1}.".format(
+                        url, response.status_code))
+                    jsonData = json.loads(response.text)
+                    log.debug("Response JSON: {0}".format(jsonData))
 
-                flickrDesc = ("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}".format(
-                    title, desc, credit, weburl))
-                upload_photo(filename, title, flickrDesc, tags)
+                    title = jsonData['dc:title'][0]['value'].capitalize()
+                    desc = jsonData['dc:description'][0]['value']
+                    credit = jsonData['am:creditLine'][0]['value']
+                    weburl = (
+                        'https://www.aucklandmuseum.com/collection/object/am_humanhistory-object-' + id)
 
-            else:
-                log.info("Response code {0} on {1}".format(
-                    response.status_code, id))
-                pass
+                    keepers_url = jsonData['ecrm:P50_has_current_keeper'][0]['value']
+                    tags = ""
+                    tags = get_keepers(keepers_url, http_headers)
+
+                    flickrDesc = ("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}".format(
+                        title, desc, credit, weburl))
+                    upload_photo(filename, title, flickrDesc, tags)
+
+                else:
+                    log.info("Response code {0} on {1}".format(
+                        response.status_code, id))
+                    pass
+        output.close()
     else:
         log.exception("No JPEGs in current directory. Exiting.")
         sys.exit()
