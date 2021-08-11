@@ -139,7 +139,7 @@ def get_JSON():
                     
                     log.info("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}\n{4}".format(
                         title, desc, credit, weburl, tags))
-                    # upload_photo(filename, title, flickrDesc, tags)
+                    upload_photo(filename, title, flickrDesc, tags)
 
                 else:
                     log.info("Response code {0} on {1}".format(
