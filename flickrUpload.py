@@ -137,8 +137,6 @@ def get_JSON():
                     flickrDesc = ("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}".format(
                         title, desc, credit, weburl))
                     
-                    log.info("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}\n{4}".format(
-                        title, desc, credit, weburl, tags))
                     upload_photo(filename, title, flickrDesc, tags)
 
                 else:
