@@ -4,12 +4,13 @@
  - Logs to ./flickrUpload.log
 """
 
-import csv
+
 import glob
 import json
 import logging
 import os
 import sys
+import csv
 
 import flickr_api
 import requests
@@ -51,15 +52,24 @@ def get_keepers(url, http_headers):
     """Gets \"keepers\" (i.e., departments) from the AM API and returns a
     space-delimited string for Flickr's \'tags\' field."""
     keepers = []
-    keepers_response = requests.request("GET", url, headers=http_headers)
-    if keepers_response.status_code == 200:
-        jsonData = json.loads(keepers_response.text)
+    response = requests.request("GET", url, headers=http_headers)
+    if response.status_code == 200:
+        jsonData = json.loads(response.text)
         for key in jsonData['rdf:value']:
             keepers.append(key['value'])
             keepers = [keeper.replace(' ', '-').lower() for keeper in keepers]
         tags = " ".join(list(map(str, keepers)))
     return tags
 
+def get_OtherTitle(url, http_headers):
+    """Gets the record's Other Title from the AM API and returns it"""
+    response = requests.request("GET", url, headers=http_headers)
+    if response.status_code == 200:
+        jsonData = json.loads(response.text)
+        try:
+            return jsonData['rdf:value'][0]['value']
+        except KeyError:
+            return '[No description]'
 
 def get_JSON():
     """Reads filenames, extracts IDs and retrieves title, description, and
@@ -97,19 +107,39 @@ def get_JSON():
                     jsonData = json.loads(response.text)
                     log.debug("Response JSON: {0}".format(jsonData))
 
-                    title = jsonData['dc:title'][0]['value'].capitalize()
-                    desc = jsonData['dc:description'][0]['value']
-                    credit = jsonData['am:creditLine'][0]['value']
+                    try:
+                        title = jsonData['dc:title'][0]['value'].capitalize()
+                    except KeyError:
+                        title = '[No title]'
+
+                    try:
+                        desc = jsonData['dc:description'][0]['value']
+                    except KeyError:
+                        try:
+                            otherTitleURL = jsonData['am:otherTitle'][0]['value']
+                            desc = get_OtherTitle(otherTitleURL, http_headers)
+                        except KeyError:
+                            desc = '[No description]'
+                    except KeyError:
+                        desc = '[No description]'
+
+                    try:
+                        credit = jsonData['am:creditLine'][0]['value']
+                    except KeyError:
+                        credit = '[No credit line]'
+
                     weburl = (
                         'https://www.aucklandmuseum.com/collection/object/am_humanhistory-object-' + id)
-
                     keepers_url = jsonData['ecrm:P50_has_current_keeper'][0]['value']
                     tags = ""
                     tags = get_keepers(keepers_url, http_headers)
 
                     flickrDesc = ("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}".format(
                         title, desc, credit, weburl))
-                    upload_photo(filename, title, flickrDesc, tags)
+                    
+                    log.info("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}\n{4}".format(
+                        title, desc, credit, weburl, tags))
+                    # upload_photo(filename, title, flickrDesc, tags)
 
                 else:
                     log.info("Response code {0} on {1}".format(
