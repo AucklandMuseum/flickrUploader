@@ -5,14 +5,13 @@
 """
 
 
+import csv
 import glob
 import json
 import logging
-import os
 import sys
-import csv
 
-import flickr_api
+import flickrapi
 import requests
 from decouple import config
 
@@ -31,12 +30,14 @@ logfile.setLevel(logging.DEBUG)
 log.addHandler(stream_handler)
 log.addHandler(logfile)
 
-authDataFile = "flickrAuthData.txt"
 flickrKey = config('FLICKR_KEY')
 flickrSecret = config('FLICKR_SECRET')
 
-flickr_api.set_keys(api_key=flickrKey,
-                    api_secret=flickrSecret)
+# Create flickr object from the FlickrAPI constructor. Get parsed JSON,
+# and save the token in a folder relative to this script. Use caching.
+flickr = flickrapi.FlickrAPI(
+    api_key=flickrKey, secret=flickrSecret, format='parsed-json',
+    cache=True, token_cache_location=".\\.flickr")
 
 
 def two_decimals(number: float):
@@ -50,16 +51,25 @@ def two_decimals(number: float):
 
 def get_keepers(url, http_headers):
     """Gets \"keepers\" (i.e., departments) from the AM API and returns a
-    space-delimited string for Flickr's \'tags\' field."""
-    keepers = []
+    space-delimited string for Flickr's \'tags\' field. Wraps departments
+    containing spaces in double quote marks."""
+    
+    keepers = ''
     response = requests.request("GET", url, headers=http_headers)
     if response.status_code == 200:
         jsonData = json.loads(response.text)
-        for key in jsonData['rdf:value']:
-            keepers.append(key['value'])
-            keepers = [keeper.replace(' ', '-').lower() for keeper in keepers]
-        tags = " ".join(list(map(str, keepers)))
-    return tags
+        values = jsonData['rdf:value']
+
+        for count, keeper in enumerate(values, start=1):
+            dept = keeper['value']
+            if ' ' in dept:
+                dept = "\"{0}\"".format(dept)
+            keepers += dept
+            if count < len(values):
+                keepers += " "
+
+    return keepers.lower()
+
 
 def get_OtherTitle(url, http_headers):
     """Gets the record's Other Title from the AM API and returns it"""
@@ -71,13 +81,14 @@ def get_OtherTitle(url, http_headers):
         except KeyError:
             return '[No description]'
 
+
 def get_JSON():
     """Reads filenames, extracts IDs and retrieves title, description, and
     credit line from the AM API. Adds departments as tags."""
     num_files = len(glob.glob('*.jpg'))
     if num_files > 0:
         log.info("Found {0} JPEG files".format(num_files))
-        print("")
+        print('\n')
         jpeg_files = glob.iglob('*.jpg')
 
         with open("file_list.csv", 'w', newline='', encoding='utf-8') as output:
@@ -88,7 +99,8 @@ def get_JSON():
 
             for count, filename in enumerate(jpeg_files, start=1):
                 write.writerow([count, filename])
-                print("----\n")
+                print(8 * "-")
+                print("\n")
                 percent_complete = ((count * 100) / num_files)
                 log.info("File: {0} ({1} of {2}; {3}%).".format(
                     filename,
@@ -136,7 +148,7 @@ def get_JSON():
 
                     flickrDesc = ("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}".format(
                         title, desc, credit, weburl))
-                    
+
                     upload_photo(filename, title, flickrDesc, tags)
 
                 else:
@@ -144,48 +156,48 @@ def get_JSON():
                         response.status_code, id))
                     pass
         output.close()
-    else:
-        log.exception("No JPEGs in current directory. Exiting.")
+        print(8 * "-")
+        log.info("\nFinished!")
         sys.exit()
-    log.info("Finished!")
-
-
-def get_credentials():
-    """Authorise with Flickr."""
-    flickrAuthHandler = flickr_api.auth.AuthHandler()
-    permissions = 'write'
-    url = flickrAuthHandler.get_authorization_url(permissions)
-
-    log.info('Authorisation URL: {0}'.format(url))
-    print("Open this URL in a web browser, authorise this script, and you should see an XML file.")
-    verification_code = input(
-        "Paste the contents of the oauth_verifier tag here: ")
-    log.info("Verification code: {0}".format(verification_code))
-    flickrAuthHandler.set_verifier(verification_code)
-    flickr_api.set_auth_handler(flickrAuthHandler)
-
-    # Save authorisation data to a local file for easy re-use.
-    flickrAuthHandler.save('flickrAuthData.txt')
-    log.info("Authenticated. Details saved to flickrAuthData.txt.")
-    login()
+    else:
+        log.info("No JPEGs in current directory. Exiting.")
+        sys.exit()
 
 
 def login():
     """Login to Flickr and report some basic user info."""
-    flickr_api.set_auth_handler(authDataFile)
-    user = flickr_api.test.login()
-    log.info("Logged in as " + (user.username) + " (" + (user.id) + ")")
-    log.info("Flickr photo count: {0}".format(user.upload_count))
+    current_user = flickr.test.login()
+    username = current_user['user']['username']['_content']
+    id = current_user['user']['id']
+    log.info("Logged in as " + (username) + " (" + id + ")")
+    
+    user_info = flickr.people.getInfo(user_id=id)
+    upload_count = user_info['person']['upload_count']
+    views = user_info['person']['photos']['views']['_content']
+    log.info("{0} photos; {1} views".format(upload_count, views))
+    
     get_JSON()
 
 
 def auth_check():
-    """Check flickrAuthData.txt exists and isn't blank,
-    then assume it contains valid verification data and begin login process."""
-    if os.path.exists(authDataFile) and os.path.getsize(authDataFile) > 0:
-        login()
-    else:
-        get_credentials()
+    """Check if a token exists (in .flickr), otherwise obtain one."""
+    permissions = 'write'
+    if not flickr.token_valid(perms=permissions):
+        log.info("No valid token stored. Getting a new one.")
+        flickr.get_request_token(oauth_callback='oob')
+
+        # Print the Authorisation URL, and ask the user to open it.
+        authorisation_url = flickr.auth_url(perms=permissions)
+        log.info("Authorisation URL:\n{0}\n".format(authorisation_url))
+        print("Open this URL in a web browser, authorise this app, and you should see a verifier code in the format nnn-nnn-nnn.")
+
+        # Get the verifier code from the user.
+        verification_code = str(input(
+            "Paste the code here: "))
+
+        # Trade the request token for an access token
+        flickr.get_access_token(verification_code)
+    login()
 
 
 def upload_photo(file, title, desc, tags):
@@ -194,15 +206,16 @@ def upload_photo(file, title, desc, tags):
     log.info("Description: \"{0}\"".format(desc))
     log.info("Tag(s): \"{0}\"".format(tags))
     log.info("Uploading {0}".format(file))
-    # left off is_public=0 because it doesn't seem to work
-    # TODO: set copyright status (CC-BY) through this function
-    flickr_api.upload(photo_file=file, title=title, description=desc, tags=tags,
-                      safety_level=1,
-                      content_type=1,
-                      asynchronous=0)
+
+    # flickr.upload(photo_file=file, title=title, description=desc, tags=tags,
+    #               safety_level=1,
+    #               content_type=1,
+    #               is_public=0,
+    #               asynchronous=1)
     log.info("Done.\n")
-    pass
 
 
 if __name__ == "__main__":
+    print("\nFlickr uploader.")
+    print(80 * "=")
     auth_check()

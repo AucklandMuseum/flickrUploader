@@ -22,7 +22,7 @@ FLICKR_KEY = "<key>"
 FLICKR_SECRET = "<secret>"
 ```
 
-Your access token will be stored in `.flickr`. Do not upload this file or your `.env` to a repository!
+Your access token will be stored in the local folder `.flickr`. Be sure you don't upload this folder or your `.env` file to a public repository.
 
 ## Run the script
 ```

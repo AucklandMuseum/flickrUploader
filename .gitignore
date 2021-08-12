@@ -1,6 +1,6 @@
 .env
 *.log
-flickrAuthData.txt
 *.jpg
 .vscode
 .flickr
+file_list.csv
