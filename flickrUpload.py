@@ -9,6 +9,7 @@ import csv
 import glob
 import json
 import logging
+import os
 import sys
 
 import flickrapi
@@ -100,9 +101,8 @@ def get_JSON():
             for count, filename in enumerate(jpeg_files, start=1):
                 write.writerow([count, filename])
                 print(8 * "-")
-                print("\n")
                 percent_complete = ((count * 100) / num_files)
-                log.info("File: {0} ({1} of {2}; {3}%).".format(
+                log.info("\nFile: {0} ({1} of {2}; {3}%).".format(
                     filename,
                     count,
                     num_files,
@@ -142,9 +142,12 @@ def get_JSON():
 
                     weburl = (
                         'https://www.aucklandmuseum.com/collection/object/am_humanhistory-object-' + id)
-                    keepers_url = jsonData['ecrm:P50_has_current_keeper'][0]['value']
                     tags = ""
-                    tags = get_keepers(keepers_url, http_headers)
+                    try:
+                        keepers_url = jsonData['ecrm:P50_has_current_keeper'][0]['value']
+                        tags = get_keepers(keepers_url, http_headers)
+                    except:
+                        log.debug("No keepers entry in JSON. Tags will be blank.")
 
                     flickrDesc = ("Title: {0}\nDescription: {1}\nCredit: {2}\n{3}".format(
                         title, desc, credit, weburl))
@@ -157,7 +160,7 @@ def get_JSON():
                     pass
         output.close()
         print(8 * "-")
-        log.info("\nFinished!")
+        log.info("\nFinished!\n\n")
         sys.exit()
     else:
         log.info("No JPEGs in current directory. Exiting.")
@@ -200,12 +203,40 @@ def auth_check():
     login()
 
 
+def human_size(size_bytes):
+    # Adapted from https://stackoverflow.com/a/6547474/10267529
+    """
+    Convert a file's size from bytes to a 'human-readable' format -- i.e. bytes, KB, MB, GB, TB, PB
+    Note that bytes/KB will be reported in whole numbers but MB and above will have greater precision
+    e.g. 1 byte, 43 bytes, 443 KB, 4.3 MB, 4.43 GB, etc
+    """
+    if size_bytes == 1:
+        return "1 byte"
+
+    suffixes_table = [('bytes',0),('KB',1),('MB',2),('GB',2),('TB',2), ('PB',2)]
+
+    num = float(size_bytes)
+    for suffix, precision in suffixes_table:
+        if num < 1024.0:
+            break
+        num /= 1024.0
+
+    if precision == 0:
+        formatted_size = "%d" % num
+    else:
+        formatted_size = str(round(num, ndigits=precision))
+
+    return "%s %s" % (formatted_size, suffix)
+
+
 def upload_photo(file, title, desc, tags):
     """Upload the JPEG to Flickr, with title, description, and tags."""
     log.info("Title: \"{0}\"".format(title))
     log.info("Description: \"{0}\"".format(desc))
     log.info("Tag(s): \"{0}\"".format(tags))
-    log.info("Uploading {0}".format(file))
+    size = os.path.getsize(file)
+    size_converted = human_size(size)
+    log.info("Uploading {0} ({1})".format(file, size_converted))
 
     # flickr.upload(photo_file=file, title=title, description=desc, tags=tags,
     #               safety_level=1,
