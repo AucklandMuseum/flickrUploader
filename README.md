@@ -6,7 +6,7 @@ This script reads JPEG files in a directory and uploads them to Flickr.
  - Logs to `flickrUpload.log`
 
 ## Libraries 
-This project uses @[alexis-mignon](//github.com/alexis-mignon)'s [`python-flickr-api` library](//github.com/alexis-mignon/python-flickr-api), an interface to [the Flickr API](//www.flickr.com/services/developer/api/).
+This project uses sybrenstuvel's [flickrapi](https://github.com/sybrenstuvel/flickrapi) Python interface to [the Flickr API](//www.flickr.com/services/developer/api/).
 
 ## Setup
 Install pip dependencies:
@@ -22,8 +22,9 @@ FLICKR_KEY = "<key>"
 FLICKR_SECRET = "<secret>"
 ```
 
+Your access token will be stored in `.flickr`. Do not upload this file or your `.env` to a repository!
+
 ## Run the script
 ```
 python flickrUpload.py
 ```
-
