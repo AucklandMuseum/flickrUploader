@@ -84,9 +84,15 @@ def get_data(user_identifier: str, total_photos: int):
                 tags = attr['tags']
                 mach_tags = attr['machine_tags']
                 url_o = attr['url_o']
-                # Replaces new lines (\n) in the Description field so as to not break the csv
+
                 xml_desc = photo.find('description').text
-                description = xml_desc.replace('\n', '\\n')
+                # Account for uploads lacking a description
+                if xml_desc is not None:
+                    # Replaces new lines (\n) in the Description field so as to not break the csv
+                    # (Not sure how this actually works to be honest.)
+                    description = xml_desc.replace('\n', '\\n')
+                else:
+                    description = None
                 write.writerow(
                     [id, title, description, tags, mach_tags, url_o])
                 log.debug("Wrote record {0}".format(id))
