@@ -1,4 +1,5 @@
 
+from __future__ import unicode_literals
 import csv
 import logging
 import sys
@@ -83,10 +84,12 @@ def get_data(user_identifier: str, total_photos: int):
                 tags = attr['tags']
                 mach_tags = attr['machine_tags']
                 url_o = attr['url_o']
-                # Use repr on description bc it contains newlines that would break the csv
-                description = repr(photo.find('description').text)
+                # Replaces new lines (\n) in the Description field so as to not break the csv
+                xml_desc = photo.find('description').text
+                description = xml_desc.replace('\n', '\\n')
                 write.writerow(
                     [id, title, description, tags, mach_tags, url_o])
+                log.debug("Wrote record {0}".format(id))
                 pbar.next()
         print("Complete.")
         print(80 * "=")
