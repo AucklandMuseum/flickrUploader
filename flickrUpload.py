@@ -172,7 +172,7 @@ def login():
     current_user = flickr.test.login()
     username = current_user['user']['username']['_content']
     id = current_user['user']['id']
-    log.info("Logged in as " + (username) + " (" + id + ")")
+    log.info("Logged in as {0} ({1})".format(username, id))
     
     user_info = flickr.people.getInfo(user_id=id)
     upload_count = user_info['person']['upload_count']
