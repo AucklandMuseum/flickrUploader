@@ -1,10 +1,12 @@
 
 import csv
 import logging
+import sys
 import xml.etree.ElementTree as ET
 
 import flickrapi
 from decouple import config
+from progress.bar import Bar
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -40,11 +42,12 @@ def login():
     log.info("Logged in as {0} ({1})".format(username, id))
 
     user_info = flickr.people.getInfo(user_id=id)
-    upload_count = user_info.find('.//count').text
+    upload_count = int(user_info.find('.//count').text)
     views = user_info.find('.//views').text
     log.info("{0} photos; {1} views".format(upload_count, views))
 
-    get_data(user_identifier=id)
+    get_data(user_identifier=id, total_photos=upload_count)
+
 
 def auth_check():
     """Check if a token exists (in .flickr), otherwise obtain one."""
@@ -66,29 +69,37 @@ def auth_check():
         flickr.get_access_token(verification_code)
     login()
 
-def get_data(user_identifier: str):
-    print("Get data starts here.")
-    walker = flickr.walk_user(user_id=user_identifier, extras="description, tags, machine_tags, path_alias, url_o")
+
+def get_data(user_identifier: str, total_photos: int):
+    walker = flickr.walk_user(user_id=user_identifier,
+                              extras="description, tags, machine_tags, url_o")
     with open("flickrResults.csv", mode='a', newline='', encoding='utf-8') as output:
         write = csv.writer(output)
-        for photo in walker:
-            attr = photo.attrib
-            id = attr['id']
-            title = attr['title']
-            tags = attr['tags']
-            mach_tags = attr['machine_tags']
-            path = attr['path_alias']
-            url_o = attr['url_o']
-            # Use repr on description bc it contains newlines that would break the csv
-            description = repr(photo.find('description').text)
-            write.writerow([id, title, description, tags, mach_tags, path, url_o])
+        with Bar('Downloading metadata...', max=total_photos) as pbar:
+            for count, photo in enumerate(walker):
+                attr = photo.attrib
+                id = attr['id']
+                title = attr['title']
+                tags = attr['tags']
+                mach_tags = attr['machine_tags']
+                url_o = attr['url_o']
+                # Use repr on description bc it contains newlines that would break the csv
+                description = repr(photo.find('description').text)
+                write.writerow(
+                    [id, title, description, tags, mach_tags, url_o])
+                pbar.next()
+        print("Complete.")
+        print(80 * "=")
+        sys.exit()
+
 
 if __name__ == "__main__":
     print("\nFlickr downloader.")
 
     with open("flickrResults.csv", mode='w', newline='', encoding='utf-8') as output:
         # Write headers to CSV file
-        headers = ["flickr_id", "title", "desc", "tags", "machine_tags", "path", "flickr_url"]
+        headers = ["flickr_id", "title", "desc",
+                   "tags", "machine_tags", "flickr_url"]
         write = csv.writer(output)
         write.writerow(headers)
         output.close()
