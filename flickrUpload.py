@@ -15,6 +15,7 @@ import sys
 import flickrapi
 import requests
 from decouple import config
+from progress.bar import Bar
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -36,9 +37,10 @@ flickrSecret = config('FLICKR_SECRET')
 
 # Create flickr object from the FlickrAPI constructor. Get parsed JSON,
 # and save the token in a folder relative to this script. Use caching.
+# Set location to ".\\.flickr" if using Windows #TODO: see if this is actually necessary
 flickr = flickrapi.FlickrAPI(
     api_key=flickrKey, secret=flickrSecret, format='parsed-json',
-    cache=True, token_cache_location=".\\.flickr")
+    cache=True, token_cache_location=".flickr")
 
 
 def two_decimals(number: float):
@@ -88,7 +90,7 @@ def get_JSON():
     credit line from the AM API. Adds departments as tags."""
     num_files = len(glob.glob('*.jpg'))
     if num_files > 0:
-        log.info("Found {0} JPEG files".format(num_files))
+        log.info("Found {0} .jpg file(s)".format(num_files))
         print('\n')
         jpeg_files = glob.iglob('*.jpg')
 
@@ -203,6 +205,26 @@ def auth_check():
     login()
 
 
+class FileWithCallback(object):
+    def __init__(self, filename, callback):
+        self.file = open(filename, 'rb')
+        self.callback = callback
+        # the following attributes and methods are required
+        self.len = os.path.getsize(filename)
+        self.fileno = self.file.fileno
+        self.tell = self.file.tell
+
+    def read(self, size):
+        if self.callback:
+            with Bar('Uploading...', max=self.len, suffix='%(index)d/%(max)d bytes', redirect_stdout=True) as upload_progress:
+                    self.callback(position=self.tell(), pbar=upload_progress)
+        return self.file.read(size)
+
+
+def callback(position, pbar):
+        pbar.goto(position)
+
+
 def human_size(size_bytes):
     # Adapted from https://stackoverflow.com/a/6547474/10267529
     """
@@ -229,20 +251,23 @@ def human_size(size_bytes):
     return "%s %s" % (formatted_size, suffix)
 
 
-def upload_photo(file, title, desc, tags):
+def upload_photo(filename, title, desc, tags):
     """Upload the JPEG to Flickr, with title, description, and tags."""
     log.info("Title: \"{0}\"".format(title))
     log.info("Description: \"{0}\"".format(desc))
     log.info("Tag(s): \"{0}\"".format(tags))
-    size = os.path.getsize(file)
+    size = os.path.getsize(filename)
     size_converted = human_size(size)
-    log.info("Uploading {0} ({1})".format(file, size_converted))
+    log.info("Uploading {0} ({1})".format(filename, size_converted))
 
-    # flickr.upload(photo_file=file, title=title, description=desc, tags=tags,
-    #               safety_level=1,
-    #               content_type=1,
-    #               is_public=0,
-    #               asynchronous=1)
+    params = {}
+    params['title'] = title
+    params['description'] = desc
+    params['tags'] = tags
+
+    file_object = FileWithCallback(filename, callback)
+    flickr.upload(filename, fileobj=file_object, **params)
+
     log.info("Done.\n")
 
 
