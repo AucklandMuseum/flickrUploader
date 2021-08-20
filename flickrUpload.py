@@ -13,9 +13,11 @@ import os
 import sys
 
 import flickrapi
+import progress
 import requests
 from decouple import config
-from progress.bar import Bar
+# from progress.bar import Bar
+import tqdm
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -205,26 +207,6 @@ def auth_check():
     login()
 
 
-class FileWithCallback(object):
-    def __init__(self, filename, callback):
-        self.file = open(filename, 'rb')
-        self.callback = callback
-        # the following attributes and methods are required
-        self.len = os.path.getsize(filename)
-        self.fileno = self.file.fileno
-        self.tell = self.file.tell
-
-    def read(self, size):
-        if self.callback:
-            with Bar('Uploading...', max=self.len, suffix='%(index)d/%(max)d bytes', redirect_stdout=True) as upload_progress:
-                    self.callback(position=self.tell(), pbar=upload_progress)
-        return self.file.read(size)
-
-
-def callback(position, pbar):
-        pbar.goto(position)
-
-
 def human_size(size_bytes):
     # Adapted from https://stackoverflow.com/a/6547474/10267529
     """
@@ -250,6 +232,28 @@ def human_size(size_bytes):
 
     return "%s %s" % (formatted_size, suffix)
 
+class FileWithCallback(object):
+    def __init__(self, filename, callback):
+        self.file = open(filename, 'rb')
+        self.callback = callback
+        # the following attributes and methods are required
+        self.len = os.path.getsize(filename)
+        self.fileno = self.file.fileno
+        self.tell = self.file.tell
+
+    def read(self, size):
+        if self.callback:
+            self.callback(self.tell() * 100 // self.len)
+        return self.file.read(size)
+
+
+def callback():
+        pass
+
+class UploadProgressBar(tqdm):
+    def update_to(self, current, total):
+        self.total = total
+        self.update(current - self.n)
 
 def upload_photo(filename, title, desc, tags):
     """Upload the JPEG to Flickr, with title, description, and tags."""
@@ -264,9 +268,9 @@ def upload_photo(filename, title, desc, tags):
     params['title'] = title
     params['description'] = desc
     params['tags'] = tags
-
-    file_object = FileWithCallback(filename, callback)
-    flickr.upload(filename, fileobj=file_object, **params)
+    with UploadProgressBar(unit='B', unit_scale=True) as t:
+        file_object = FileWithCallback(filename, progress_callback=t.update_to())
+        flickr.upload(filename, fileobj=file_object, **params)
 
     log.info("Done.\n")
 
