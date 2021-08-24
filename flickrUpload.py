@@ -247,8 +247,8 @@ class FileWithCallback(object):
         return self.file.read(size)
 
 
-def callback():
-        pass
+def callback(pos, t):
+        t.update_to(pos)
 
 class UploadProgressBar(tqdm):
     def update_to(self, current, total):
@@ -269,7 +269,7 @@ def upload_photo(filename, title, desc, tags):
     params['description'] = desc
     params['tags'] = tags
     with UploadProgressBar(unit='B', unit_scale=True) as t:
-        file_object = FileWithCallback(filename, progress_callback=t.update_to())
+        file_object = FileWithCallback(filename, callback(t))
         flickr.upload(filename, fileobj=file_object, **params)
 
     log.info("Done.\n")
